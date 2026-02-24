@@ -2,8 +2,9 @@ services:
   - type: web
     name: hsbau-rapport-server
     env: python
+    pythonVersion: "3.11"
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn server:app
     envVars:
       - key: ADMIN_KEY
-        value: hsbau-admin-2024   # <-- Bitte ändern!
+        value: hsbau-admin-2024
