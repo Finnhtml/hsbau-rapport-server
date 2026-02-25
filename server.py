@@ -90,6 +90,34 @@ def status():
     </body></html>
     """
 
+
+@app.route("/set-number", methods=["POST"])
+def set_number():
+    # Allows admin to manually set a person's counter via form or JSON on the website.
+    admin_key = os.environ.get("ADMIN_KEY", "hsbau-admin-2024")
+    # Accept either JSON or form data
+    data_in = request.json if request.is_json else request.form
+    if not data_in:
+        return jsonify({"error": "Keine Daten erhalten"}), 400
+    key = data_in.get("key")
+    if key != admin_key:
+        return jsonify({"error": "Nicht autorisiert"}), 403
+    person = data_in.get("person") or data_in.get("personalnummer") or "global"
+    try:
+        value = int(data_in.get("value", 0))
+    except Exception:
+        return jsonify({"error": "Ungültiger Wert"}), 400
+
+    with lock:
+        d = load_counter()
+        counters = d.setdefault("counters", {})
+        before = counters.get(person, 0)
+        counters[person] = value
+        d.setdefault("history", []).append({"nummer": "MANUAL_SET", "person": person, "von": before, "auf": value, "zeitpunkt": datetime.now().isoformat(), "gerät": request.remote_addr})
+        save_counter(d)
+
+    return jsonify({"success": True, "person": person, "neuer_wert": value, "vorher": before})
+
 # ── Keep-Alive: pingt sich selbst alle 10 Minuten an ──
 def _keep_alive():
     import time
