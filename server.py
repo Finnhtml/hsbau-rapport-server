@@ -17,7 +17,8 @@ def load_counter():
                 return json.load(f)
         except:
             pass
-    return {"current": 0, "history": []}
+    # New format: counters per person + history
+    return {"counters": {}, "history": []}
 
 def save_counter(data):
     with open(COUNTER_FILE, "w") as f:
@@ -25,24 +26,31 @@ def save_counter(data):
 
 @app.route("/next-number", methods=["GET"])
 def next_number():
+    person = request.args.get("person") or request.args.get("personalnummer") or "global"
     with lock:
         data = load_counter()
-        data["current"] += 1
-        nummer = data["current"]
-        data["history"].append({
+        counters = data.setdefault("counters", {})
+        counters.setdefault(person, 0)
+        counters[person] += 1
+        nummer = counters[person]
+        data.setdefault("history", []).append({
             "nummer": nummer,
+            "person": person,
             "zeitpunkt": datetime.now().isoformat(),
             "gerät": request.args.get("geraet", "Unbekannt")
         })
-        if len(data["history"]) > 500:
+        if len(data.get("history", [])) > 500:
             data["history"] = data["history"][-500:]
         save_counter(data)
-    return jsonify({"success": True, "nummer": nummer, "formatiert": str(nummer).zfill(4)})
+    return jsonify({"success": True, "nummer": nummer, "formatiert": str(nummer).zfill(4), "person": person})
 
 @app.route("/current-number", methods=["GET"])
 def current_number():
+    person = request.args.get("person") or request.args.get("personalnummer") or "global"
     data = load_counter()
-    return jsonify({"current": data["current"], "formatiert": str(data["current"]).zfill(4)})
+    counters = data.get("counters", {})
+    current = counters.get(person, 0)
+    return jsonify({"current": current, "formatiert": str(current).zfill(4), "person": person})
 
 @app.route("/history", methods=["GET"])
 def history():
@@ -54,23 +62,31 @@ def reset():
     admin_key = os.environ.get("ADMIN_KEY", "hsbau-admin-2024")
     if request.json.get("key") != admin_key:
         return jsonify({"error": "Nicht autorisiert"}), 403
+    person = request.json.get("person") or request.json.get("personalnummer") or "global"
     with lock:
         data = load_counter()
-        data["history"].append({"nummer": "RESET", "zeitpunkt": datetime.now().isoformat(), "vorher": data["current"]})
-        start = request.json.get("start_bei", 0)
-        data["current"] = start
+        data.setdefault("history", []).append({"nummer": "RESET", "zeitpunkt": datetime.now().isoformat(), "person": person, "vorher": data.get("counters", {}).get(person, 0)})
+        start = int(request.json.get("start_bei", 0))
+        counters = data.setdefault("counters", {})
+        counters[person] = start
         save_counter(data)
-    return jsonify({"success": True, "neuer_stand": start})
+    return jsonify({"success": True, "neuer_stand": start, "person": person})
 
 @app.route("/", methods=["GET"])
 def status():
     data = load_counter()
+    counters = data.get("counters", {})
+    last = (data.get("history") or [])[-1] if data.get("history") else None
+    counters_html = "".join([f"<li>{p}: {n}</li>" for p, n in counters.items()]) or "<li>keine</li>"
     return f"""
     <html><body style="font-family:sans-serif;padding:40px;background:#f5f5f5">
     <h1 style="color:#E30613">HSBAU Rapport-Nummer Server</h1>
     <p>✅ Server läuft</p>
-    <p><b>Aktuelle Nummer:</b> {data['current']}</p>
-    <p><b>Letzte Vergabe:</b> {data['history'][-1]['zeitpunkt'] if data['history'] else 'Noch keine'}</p>
+    <p><b>Aktuelle Nummern (pro Personal):</b></p>
+    <ul>
+    {counters_html}
+    </ul>
+    <p><b>Letzte Vergabe:</b> {last['zeitpunkt'] if last else 'Noch keine'}</p>
     </body></html>
     """
 
