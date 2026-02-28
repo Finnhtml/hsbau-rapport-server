@@ -99,7 +99,7 @@ def status():
         f"<td style='padding:6px 16px'>{p}-{str(n).zfill(4)}</td></tr>"
         for p, n in sorted(personen.items())
     )
-    letzte = data.get("history", [{}])[-1]
+    letzte = data.get("history", [])[-1] if data.get("history") else {}
     return f"""
     <html><body style="font-family:sans-serif;padding:40px;background:#f5f5f5">
     <h1 style="color:#E30613">HSBAU Rapport-Nummer Server</h1>
