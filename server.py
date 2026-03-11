@@ -2,10 +2,14 @@
 # Pro Personalnummer eigene fortlaufende Nummer + Admin-Panel
 
 from flask import Flask, jsonify, request, render_template_string, redirect, session
+from flask_cors import CORS                                                          # ← NEU
 from datetime import datetime
 import json, os, threading, urllib.request
 
 app = Flask(__name__)
+CORS(app, resources={r"/next-number": {"origins": "*"},                             # ← NEU
+                     r"/current-numbers": {"origins": "*"},
+                     r"/history": {"origins": "*"}})
 app.secret_key = os.environ.get("SECRET_KEY", "hsbau-secret-2024")
 lock = threading.Lock()
 
@@ -283,7 +287,7 @@ def admin_set():
         with lock:
             data = load_counter()
             if "personen" not in data: data["personen"] = {}
-            data["personen"][person] = naechste_int - 1  # -1 weil beim Speichern +1 gemacht wird
+            data["personen"][person] = naechste_int - 1
             data["history"].append({
                 "person":    person,
                 "nummer":    f"ADMIN-SET→{person}-{str(naechste_int).zfill(4)}",
