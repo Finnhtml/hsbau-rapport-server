@@ -14,7 +14,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "hsbau-secret-2024")
 lock = threading.Lock()
 
 COUNTER_FILE = "rapport_counter.json"
-ADMIN_KEY    = os.environ.get("ADMIN_KEY", "hsbau-admin-2024")
+ADMIN_KEY    = os.environ.get("ADMIN_KEY", "hsbauadmin2026")
 
 def load_counter():
     if os.path.exists(COUNTER_FILE):
