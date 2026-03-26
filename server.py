@@ -2,16 +2,15 @@
 # Pro Personalnummer eigene fortlaufende Nummer + Admin-Panel
 
 from flask import Flask, jsonify, request, render_template_string, redirect, session
-from flask_cors import CORS                                                          # ← NEU
+from flask_cors import CORS
 from datetime import datetime
-import json, os, threading, urllib.request
+import json, os
 
 app = Flask(__name__)
-CORS(app, resources={r"/next-number": {"origins": "*"},                             # ← NEU
+CORS(app, resources={r"/next-number": {"origins": "*"},
                      r"/current-numbers": {"origins": "*"},
                      r"/history": {"origins": "*"}})
 app.secret_key = os.environ.get("SECRET_KEY", "hsbau-secret-2024")
-lock = threading.Lock()
 
 COUNTER_FILE = "rapport_counter.json"
 ADMIN_KEY    = os.environ.get("ADMIN_KEY", "hsbauadmin2026")
@@ -34,6 +33,8 @@ def save_counter(data):
 @app.route("/next-number", methods=["GET"])
 def next_number():
     person = request.args.get("person", "").strip().zfill(2)
+    import threading
+    lock = threading.Lock()
     with lock:
         data = load_counter()
         if "personen" not in data: data["personen"] = {}
@@ -75,6 +76,8 @@ def history():
 def reset():
     if request.json.get("key") != ADMIN_KEY:
         return jsonify({"error": "Nicht autorisiert"}), 403
+    import threading
+    lock = threading.Lock()
     with lock:
         data = load_counter()
         person = request.json.get("person", "").strip()
@@ -284,6 +287,8 @@ def admin_set():
         naechste_int = int(naechste)
         if naechste_int < 1:
             raise ValueError
+        import threading
+        lock = threading.Lock()
         with lock:
             data = load_counter()
             if "personen" not in data: data["personen"] = {}
@@ -303,6 +308,8 @@ def admin_set():
 def admin_reset_all():
     if not session.get("admin_logged_in"):
         return redirect("/admin")
+    import threading
+    lock = threading.Lock()
     with lock:
         data = load_counter()
         data["personen"] = {}
@@ -344,19 +351,6 @@ def status():
     <br><a href="/admin" style="color:#E30613;font-weight:bold">→ Admin-Panel öffnen</a>
     </body></html>
     """
-
-def _keep_alive():
-    import time
-    server_url = os.environ.get("RENDER_EXTERNAL_URL", "http://localhost:5000")
-    while True:
-        time.sleep(600)
-        try:
-            urllib.request.urlopen(f"{server_url}/", timeout=5)
-            print("[HSBAU] Keep-alive ping ✓")
-        except Exception as e:
-            print(f"[HSBAU] Keep-alive fehlgeschlagen: {e}")
-
-threading.Thread(target=_keep_alive, daemon=True).start()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
